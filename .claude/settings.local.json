@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill -f \"node server.js\")",
+      "Bash(node server.js)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill *)",
+      "Bash(killall -9 node)",
+      "Bash(kill *)",
+      "Bash(open *)",
+      "Bash(curl *)"
+    ]
+  }
+}
