@@ -2,7 +2,7 @@
 
 ## 在线访问 URL
 
-https://ai-stock-panel.onrender.com
+https://ai-stock-panel-1.onrender.com
 
 ## 核心功能
 
