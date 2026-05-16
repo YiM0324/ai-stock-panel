@@ -43,9 +43,19 @@ app.get('/api/stock/:symbol', async (req, res) => {
       }
     });
 
+    // 检查 API 是否返回额度限制信息
+    if (response.data['Information']) {
+      console.error('Alpha Vantage API 限制:', response.data['Information']);
+      return res.status(429).json({
+        error: 'API 额度已用完',
+        message: 'Alpha Vantage 免费版每日限额 25 次已用完，请明天再试或升级付费版',
+        detail: response.data['Information']
+      });
+    }
+
     const data = response.data['Global Quote'];
     if (!data || Object.keys(data).length === 0) {
-      return res.status(404).json({ error: '股票代码未找到或API限制' });
+      return res.status(404).json({ error: '股票代码未找到' });
     }
 
     const stockData = {

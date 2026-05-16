@@ -162,7 +162,9 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || '获取数据失败');
+                    // 优先使用后端返回的友好提示
+                    const errorMsg = data.message || data.error || '获取数据失败';
+                    throw new Error(errorMsg);
                 }
 
                 currentStockData = data;
