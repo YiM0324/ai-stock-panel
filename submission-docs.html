@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 股票分析面板 - 任务提交文档</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+        }
+        .highlight {
+            background: #fef3c7;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- 标题区 -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-8 mb-8">
+            <h1 class="text-3xl font-bold mb-2">AI 股票分析面板</h1>
+            <p class="text-blue-100">任务提交文档 - 包含 Prompt、Debug 记录与技术栈说明</p>
+        </div>
+
+        <!-- 项目基本信息 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 项目基本信息</h2>
+            <table class="w-full">
+                <tr class="border-b">
+                    <td class="py-3 font-semibold text-gray-600 w-1/4">项目名称</td>
+                    <td class="py-3">AI 股票分析面板（精简版）</td>
+                </tr>
+                <tr class="border-b">
+                    <td class="py-3 font-semibold text-gray-600">在线访问</td>
+                    <td class="py-3">
+                        <a href="https://ai-stock-panel-1.onrender.com" class="text-blue-600 hover:underline" target="_blank">
+                            https://ai-stock-panel-1.onrender.com
+                        </a>
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="py-3 font-semibold text-gray-600">主要功能</td>
+                    <td class="py-3">
+                        <ul class="list-disc list-inside">
+                            <li>输入股票代码，调用 Alpha Vantage API 获取实时行情</li>
+                            <li>点击 AI 分析，调用 Claude/Kimi 生成严格 JSON 格式分析</li>
+                            <li>所有分析数据自动存入 Supabase 数据库</li>
+                        </ul>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Prompt 代码 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📝 强制 JSON Prompt 代码</h2>
+            <p class="text-gray-600 mb-4">服务器端 Prompt 定义（server.js 第 86-96 行）：</p>
+            <div class="code-block">
+                <pre>const prompt = `请分析以下股票数据，提供投资分析和建议。
+
+股票代码: ${symbol}
+当前价格: $${stockData.price}
+涨跌额: $${stockData.change}
+涨跌幅: ${stockData.changePercent}
+成交量: ${stockData.volume.toLocaleString()}
+最新交易日: ${stockData.latestTradingDay}
+
+重要：你必须只返回JSON格式，不要添加任何其他文字、标记或代码块。格式如下：
+{"summary": "对该股票的简要分析和总结（50-100字）", "sentiment": "Bullish或Neutral或Bearish", "risk_level": "High或Medium或Low"}`;</pre>
+            </div>
+
+            <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+                <p class="font-semibold text-blue-800 mb-2">Prompt 设计要点：</p>
+                <ul class="list-disc list-inside text-blue-700 text-sm">
+                    <li>明确指定返回格式为纯 JSON，禁止 markdown 和代码块</li>
+                    <li>sentiment 限制为三个枚举值：Bullish/Neutral/Bearish</li>
+                    <li>risk_level 限制为三个枚举值：High/Medium/Low</li>
+                    <li>包含动态股票数据注入</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- JSON 解析处理 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🔧 JSON 解析容错处理</h2>
+            <p class="text-gray-600 mb-4">server.js 第 135-162 行的三层解析策略：</p>
+            <div class="code-block">
+                <pre>// 解析 JSON
+try {
+  // 第一层：直接解析
+  analysis = JSON.parse(aiResponse.trim());
+  console.log('✓ 直接解析 JSON 成功');
+} catch (e1) {
+  // 第二层：清理 markdown 后解析
+  try {
+    let clean = aiResponse.trim()
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+    analysis = JSON.parse(clean);
+    console.log('✓ 清理后解析 JSON 成功');
+  } catch (e2) {
+    // 第三层：提取 JSON 部分
+    const match = aiResponse.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        analysis = JSON.parse(match[0]);
+        console.log('✓ 提取后解析 JSON 成功');
+      } catch (e3) {
+        throw new Error('JSON解析失败: ' + e3.message);
+      }
+    } else {
+      throw new Error('未找到JSON');
+    }
+  }
+}</pre>
+            </div>
+        </div>
+
+        <!-- Debug 记录 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🐛 Debug 记录</h2>
+
+            <div class="space-y-4">
+                <!-- 问题 1 -->
+                <div class="border-l-4 border-red-500 pl-4 py-2 bg-red-50 rounded">
+                    <h3 class="font-bold text-red-800">问题 1：Supabase 保存失败</h3>
+                    <p class="text-sm text-gray-700 mt-1">
+                        <span class="font-semibold">错误信息：</span>
+                        <code class="bg-red-100 px-1 rounded">new row violates row-level security policy</code>
+                    </p>
+                    <p class="text-sm text-gray-700 mt-1">
+                        <span class="font-semibold">原因：</span>Supabase 默认启用行级安全策略(RLS)，未配置访问策略时拒绝插入
+                    </p>
+                    <p class="text-sm text-gray-700 mt-1">
+                        <span class="font-semibold">解决：</span>执行 SQL 关闭 RLS 权限
+                    </p>
+                    <div class="code-block mt-2 text-sm">
+                        <pre>ALTER TABLE stock_analyses DISABLE ROW LEVEL SECURITY;</pre>
+                    </div>
+                </div>
+
+                <!-- 问题 2 -->
+                <div class="border-l-4 border-orange-500 pl-4 py-2 bg-orange-50 rounded">
+                    <h3 class="font-bold text-orange-800">问题 2：数据库字段不匹配</h3>
+                    <p class="text-sm text-gray-700 mt-1">
+                        <span class="font-semibold">错误信息：</span>
+                        <code class="bg-orange-100 px-1 rounded">column "change" does not exist</code>
+                    </p>
+                    <p class="text-sm text-gray-700 mt-1">
+                        <span class="font-semibold">原因：</span>Supabase 表结构与代码期望的字段不一致
+                    </p>
+                    <p class="text-sm text-gray-700 mt-1">
+                        <span class="font-semibold">解决：</span>删除旧表并重新创建完整表结构
+                    </p>
+                    <div class="code-block mt-2 text-sm">
+                        <pre>-- 删除旧表（如果存在）
+DROP TABLE IF EXISTS stock_analyses;
+
+-- 创建完整表结构
+CREATE TABLE stock_analyses (
+  id SERIAL PRIMARY KEY,
+  symbol VARCHAR(10) NOT NULL,
+  price DECIMAL(10,2) NOT NULL,
+  change DECIMAL(10,2) NOT NULL,
+  change_percent VARCHAR(20) NOT NULL,
+  volume BIGINT NOT NULL,
+  analysis_summary TEXT NOT NULL,
+  sentiment VARCHAR(20) NOT NULL,
+  risk_level VARCHAR(20) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 关闭行级安全（简化开发）
+ALTER TABLE stock_analyses DISABLE ROW LEVEL SECURITY;</pre>
+                    </div>
+                </div>
+
+                <!-- 问题 3 -->
+                <div class="border-l-4 border-yellow-500 pl-4 py-2 bg-yellow-50 rounded">
+                    <h3 class="font-bold text-yellow-800">问题 3：AI 返回格式不固定</h3>
+                    <p class="text-sm text-gray-700 mt-1">
+                        <span class="font-semibold">现象：</span>AI 有时返回 markdown 代码块，有时返回纯文本
+                    </p>
+                    <p class="text-sm text-gray-700 mt-1">
+                        <span class="font-semibold">解决：</span>实现三层容错解析策略（详见上方 JSON 解析处理部分）
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 技术栈 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🛠️ 完整技术栈</h2>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">前端</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">模板引擎：</span>
+                            <span class="font-medium">纯 HTML5</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">CSS 框架：</span>
+                            <span class="font-medium">Tailwind CSS (CDN)</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">JavaScript：</span>
+                            <span class="font-medium">原生 ES6+ (无框架)</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">后端</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">运行环境：</span>
+                            <span class="font-medium">Node.js ≥18.0.0</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">Web 框架：</span>
+                            <span class="font-medium">Express.js 4.18.2</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">HTTP 客户端：</span>
+                            <span class="font-medium">Axios 1.6.0</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">外部 API</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">股票数据：</span>
+                            <span class="font-medium">Alpha Vantage API</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">AI 分析：</span>
+                            <span class="font-medium">Kimi (moonshot-v1-8k)</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">备选 AI：</span>
+                            <span class="font-medium">Claude 3 (支持切换)</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">数据存储 & 部署</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">数据库：</span>
+                            <span class="font-medium">PostgreSQL (Supabase)</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">部署平台：</span>
+                            <span class="font-medium">Render.com</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-32 text-gray-600">环境管理：</span>
+                            <span class="font-medium">dotenv</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h3 class="font-bold text-gray-700 mb-2">依赖包清单 (package.json)</h3>
+                <div class="code-block text-sm">
+                    <pre>{
+  "dependencies": {
+    "express": "^4.18.2",      // Web 服务器框架
+    "axios": "^1.6.0",         // HTTP 请求库
+    "@supabase/supabase-js": "^2.38.0",  // Supabase 客户端
+    "dotenv": "^16.3.1",       // 环境变量管理
+    "cors": "^2.8.5"           // 跨域处理
+  }
+}</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- API 端点 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🔌 API 端点说明</h2>
+            <table class="w-full text-sm">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="py-2 px-3 text-left">方法</th>
+                        <th class="py-2 px-3 text-left">端点</th>
+                        <th class="py-2 px-3 text-left">说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="border-b">
+                        <td class="py-2 px-3"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">GET</span></td>
+                        <td class="py-2 px-3 font-mono">/api/stock/:symbol</td>
+                        <td class="py-2 px-3">获取股票实时行情</td>
+                    </tr>
+                    <tr class="border-b">
+                        <td class="py-2 px-3"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">POST</span></td>
+                        <td class="py-2 px-3 font-mono">/api/analyze</td>
+                        <td class="py-2 px-3">AI 分析股票并保存结果</td>
+                    </tr>
+                    <tr class="border-b">
+                        <td class="py-2 px-3"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">GET</span></td>
+                        <td class="py-2 px-3 font-mono">/api/history</td>
+                        <td class="py-2 px-3">获取历史分析记录</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 px-3"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">GET</span></td>
+                        <td class="py-2 px-3 font-mono">/api/health</td>
+                        <td class="py-2 px-3">服务健康检查</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 环境变量 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🔑 环境变量配置</h2>
+            <div class="code-block text-sm">
+                <pre># 股票数据 API
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
+
+# AI 提供商 (claude 或 kimi)
+AI_PROVIDER=kimi
+
+# Kimi API (OpenAI 兼容格式)
+KIMI_API_KEY=your_moonshot_api_key
+
+# Claude API (可选)
+ANTHROPIC_API_KEY=your_anthropic_key
+
+# Supabase 数据库
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key</pre>
+            </div>
+        </div>
+
+        <!-- 提交信息 -->
+        <div class="bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg p-6">
+            <h2 class="text-xl font-bold mb-2">✅ 提交信息汇总</h2>
+            <div class="grid md:grid-cols-2 gap-4 mt-4">
+                <div class="bg-white/10 rounded p-4">
+                    <p class="text-sm text-green-100">URL 1 - 项目访问</p>
+                    <p class="font-mono text-lg">https://ai-stock-panel-1.onrender.com</p>
+                </div>
+                <div class="bg-white/10 rounded p-4">
+                    <p class="text-sm text-green-100">URL 2 - 本文档</p>
+                    <p class="font-mono text-lg">（需部署到 GitHub Pages 等平台）</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center text-gray-500 text-sm mt-8 pb-8">
+            <p>Generated for AI Stock Panel Task Submission</p>
+        </footer>
+    </div>
+</body>
+</html>
